@@ -20,10 +20,10 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 
 # --- Charger le pipeline et le label encoder ---
-model = joblib.load("models/RandomForest.pkl")  # Ou choisir selon le modèle voulu
+model = joblib.load("models/LogisticRegression.pkl")  # Ou choisir selon le modèle voulu
 le = joblib.load("models/label_encoder.pkl")
 
-st.title("🔮 Recommandation de Filière & Prédiction de Réussite")
+st.title("Recommandation de Filière & Prédiction de Réussite")
 
 # --- Variables numériques ---
 photoshop = st.slider("Maîtrise Photoshop (1-5)", 1, 5, 3)
@@ -108,14 +108,14 @@ input_dict.update(encode_multilabel(motivation, motivation_options, "Motivation"
 X_input = pd.DataFrame([input_dict])
 
 # --- Prédiction ---
-if st.button("🔍 Obtenir une recommandation"):
+if st.button("Obtenir une recommandation"):
     try:
         prediction_num = model.predict(X_input)[0]
         proba = model.predict_proba(X_input)[0]
         confidence = round(np.max(proba) * 100, 2)
         prediction_label = le.inverse_transform([prediction_num])[0]
 
-        st.success(f"🎯 Filière recommandée : **{prediction_label}**")
-        st.info(f"🔢 Taux de réussite estimé : **{confidence}%**")
+        st.success(f"Filière recommandée : **{prediction_label}**")
+        st.info(f"Taux de réussite estimé : **{confidence}%**")
     except Exception as e:
         st.error(f"Erreur lors de la prédiction : {e}")
