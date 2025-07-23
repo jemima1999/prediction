@@ -2,6 +2,22 @@ import streamlit as st
 import joblib
 import numpy as np
 import pandas as pd
+import pandas as pd
+import numpy as np
+import os
+import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 
 # --- Charger le pipeline et le label encoder ---
 model = joblib.load("models/RandomForest.pkl")  # Ou choisir selon le modèle voulu
