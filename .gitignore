@@ -21,5 +21,4 @@ Thumbs.db
 .streamlit/
 
 # Dossiers à ne pas suivre
-models/
 Images/
