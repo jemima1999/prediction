@@ -1,0 +1,25 @@
+# Environnement virtuel
+.venv/
+venv/
+
+# Fichiers temporaires et caches
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.tmp
+*.swp
+*.bak
+*.xlsx~
+.~lock.*
+
+# Fichiers spécifiques à l’OS
+.DS_Store
+Thumbs.db
+
+# Fichiers Streamlit
+.streamlit/
+
+# Dossiers à ne pas suivre
+models/
+Images/
