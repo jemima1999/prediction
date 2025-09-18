@@ -105,10 +105,54 @@ preprocessor = ColumnTransformer(transformers=[
     ("cat", OneHotEncoder(handle_unknown="ignore"), cat_features)
 ])
 
+
+X.head(5).to_excel("sample_encoded_before_training.xlsx", index=False)
+y.head(5).to_excel("fore_training.xlsx", index=False)
+print("✅ Échantillon encodé sauvegardé dans 'sample_encoded_before_training.xlsx'")
+import pandas as pd
+
+# Transformer toutes les données X (pas seulement les 5 premiers)
+X_encoded = preprocessor.fit_transform(X)
+
+# Récupérer noms colonnes OneHot
+ohe_cols = preprocessor.named_transformers_['cat'].get_feature_names_out(cat_features)
+
+# Colonnes numériques
+num_cols = num_features
+
+# Construire DataFrame complet encodé (avec toutes les lignes)
+df_encoded = pd.DataFrame(
+    X_encoded.toarray() if hasattr(X_encoded, "toarray") else X_encoded, 
+    columns = list(num_cols) + list(ohe_cols)
+)
+
+# Concaténer avec la colonne cible y (en gardant l'index aligné)
+df_final = pd.concat([df_encoded.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
+
+# Sauvegarder dans un fichier Excel (toutes les lignes)
+df_final.to_excel("bdd_complete_encoded.xlsx", index=False)
+
+print("✅ Base complète encodée + cible sauvegardée dans 'bdd_complete_encoded.xlsx'")
+
+
+
+
 # --- Modèles ---
 models = {
     "RandomForest": RandomForestClassifier(n_estimators=200, random_state=42, class_weight="balanced"),
     "GradientBoosting": GradientBoostingClassifier(n_estimators=200, random_state=42),
+    "GradientBoostingmeil": GradientBoostingClassifier(
+    n_estimators=100,
+    learning_rate=0.01,
+    max_depth=3,
+    loss="log_loss",
+    criterion="friedman_mse",
+    max_features=None,
+    subsample=1.0,
+    tol=0.0001,
+    random_state=None  # ou mets `42` si tu veux garder un comportement déterministe
+),
+
     "AdaBoost": AdaBoostClassifier(n_estimators=200, random_state=42),
     "Bagging": BaggingClassifier(n_estimators=200, random_state=42),
     "KNN": KNeighborsClassifier(),
@@ -116,6 +160,7 @@ models = {
     "MLP": MLPClassifier(random_state=42, max_iter=500),
     "NaiveBayes": GaussianNB(),
     "LogisticRegression": LogisticRegression(max_iter=500, class_weight="balanced"),
+    "LogisticRegressionmeilleur":LogisticRegression(C=1, class_weight='balanced', dual=False, fit_intercept=True, intercept_scaling=1, l1_ratio=None, max_iter=500, multi_class="deprecated", n_jobs=None, penalty='l2', random_state =None, solver ='lbfgs', tol=0.0001, verbose=0, warm_start=False),
     "Ridge": RidgeClassifier(class_weight="balanced"),
 }
 
@@ -144,3 +189,107 @@ for name, clf in models.items():
         print(f"✅ Modèle {name} sauvegardé avec succès.")
     except Exception as e:
         print(f"❌ Erreur avec le modèle {name} : {e}")
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+
+# Charger le pipeline du modèle logistic simple (si déjà sauvegardé)
+# pipeline_logistic = joblib.load("models/LogisticRegression.pkl")
+
+# Sinon, utiliser directement le pipeline entraîné
+pipeline_logistic = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", LogisticRegression(max_iter=500, class_weight="balanced"))
+])
+pipeline_logistic.fit(X_train, y_train)
+
+# Prédictions sur le test set
+y_pred = pipeline_logistic.predict(X_test)
+
+# Accuracy
+acc = accuracy_score(y_test, y_pred)
+
+# Precision, Recall et F1 (macro pour moyenne sur toutes les classes)
+prec = precision_score(y_test, y_pred, average="macro")
+rec = recall_score(y_test, y_pred, average="macro")
+f1 = f1_score(y_test, y_pred, average="macro")
+
+print(f"--- LogisticRegression sans SMOTE ---")
+print(f"Accuracy: {acc:.4f}")
+print(f"Precision (macro): {prec:.4f}")
+print(f"Recall (macro): {rec:.4f}")
+print(f"F1-score (macro): {f1:.4f}")
+
+# Optionnel : rapport complet par classe
+print("\nClassification report détaillé par classe :")
+print(classification_report(y_test, y_pred, target_names=le.classes_))
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+import joblib
+
+# --- Préparation des features ---
+X["Domaine"] = X["Domaine"].astype(str)
+cat_features = ["Domaine"]
+num_features = [col for col in features if col != "Domaine"]
+
+preprocessor = ColumnTransformer(transformers=[
+    ("num", SimpleImputer(strategy="mean"), num_features),
+    ("cat", OneHotEncoder(handle_unknown="ignore"), cat_features)
+])
+
+# --- Split ---
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, stratify=y, test_size=0.2, random_state=42
+)
+
+# --- Logistic Regression avec class_weight ---
+logreg_pipeline_weighted = Pipeline(steps=[
+    ("preprocessor", preprocessor),
+    ("classifier", LogisticRegression(
+        max_iter=1000,
+        solver="liblinear",
+        class_weight="balanced"  # pondération automatique des classes
+    ))
+])
+
+# --- GridSearchCV simple pour hyperparamètres ---
+param_grid = {
+    "classifier__C": [0.1, 1, 10],
+    "classifier__penalty": ["l1", "l2"]
+}
+
+cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+gs_logreg_weighted = GridSearchCV(
+    logreg_pipeline_weighted,
+    param_grid,
+    cv=cv_strategy,
+    scoring="f1_weighted",
+    n_jobs=-1,
+    verbose=2
+)
+
+gs_logreg_weighted.fit(X_train, y_train)
+
+# --- Prédiction et sauvegarde ---
+y_pred_weighted = gs_logreg_weighted.predict(X_test)
+joblib.dump(gs_logreg_weighted.best_estimator_, "models/logistic_class_weighted.pkl")
+
+# --- Affichage des scores ---
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+results_weighted = {
+    "Accuracy": accuracy_score(y_test, y_pred_weighted),
+    "Precision": precision_score(y_test, y_pred_weighted, average="weighted", zero_division=0),
+    "Recall": recall_score(y_test, y_pred_weighted, average="weighted", zero_division=0),
+    "F1": f1_score(y_test, y_pred_weighted, average="weighted", zero_division=0)
+}
+
+print("🎯 Meilleurs paramètres (Logistic avec class_weight) :")
+print(gs_logreg_weighted.best_params_)
+
+print("\n📊 Scores sur le test set :")
+for metric, value in results_weighted.items():
+    print(f"{metric}: {value:.4f}")
